@@ -1,0 +1,2 @@
+# musaiqe
+Music visualization library.
