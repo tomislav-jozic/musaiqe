@@ -61,10 +61,8 @@ export default class Engine {
     this.mo = new MutationObserver(() => this.readTheme()); this.mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
     this.mq = window.matchMedia("(prefers-color-scheme: dark)"); this.onScheme = () => this.readTheme(); this.mq.addEventListener && this.mq.addEventListener("change", this.onScheme);
   }
-  setInsets(left, right) { this.goalOff = this.w > 820 ? (right - left) / 2 : 0; if (this.reduced) { this.off = this.goalOff; this.applyOffset(); } this.dirty = true; }
-  applyOffset() { const o = Math.round(this.off || 0); if (o) this.camera.setViewOffset(this.w, this.h, o, 0, this.w, this.h); else this.camera.clearViewOffset(); }
   pan(dx, dy) { const m = this.camera.matrix.elements, k = this.view.dist * .0013; this.follow = -1; this.goal.target.x += (-dx * m[0] + dy * m[4]) * k; this.goal.target.y += (-dx * m[1] + dy * m[5]) * k; this.goal.target.z += (-dx * m[2] + dy * m[6]) * k; }
-  resize() { const w = this.host.clientWidth || 1, h = this.host.clientHeight || 1; this.w = w; this.h = h; this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.applyOffset(); this.camera.updateProjectionMatrix(); this.dirty = true; }
+  resize() { const w = this.host.clientWidth || 1, h = this.host.clientHeight || 1; this.w = w; this.h = h; this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); this.dirty = true; }
 
   /* graph in, buffers out */
   setGraph(g) {
@@ -199,7 +197,6 @@ export default class Engine {
     if (this.follow >= 0 && this.follow < g.nodes.length) this.goal.target.set(this.pos[this.follow * 3], this.pos[this.follow * 3 + 1], this.pos[this.follow * 3 + 2]);
     if (this.spin) this.goal.theta += .0011;
     const V = this.view, Gl = this.goal, k = this.reduced ? 1 : .14, dT = Gl.theta - V.theta, dP = Gl.phi - V.phi, dD = Gl.dist - V.dist, dX = V.target.distanceTo(Gl.target);
-    const dO = (this.goalOff || 0) - (this.off || 0); if (Math.abs(dO) > .5) { this.off = (this.off || 0) + dO * .14; this.applyOffset(); this.dirty = true; }
     const camMoving = Math.abs(dT) > 1e-4 || Math.abs(dP) > 1e-4 || Math.abs(dD) > .05 || dX > .02;
     if (this.hoverAt && !camMoving) { this.setHover(this.pick(this.hoverAt[0], this.hoverAt[1])); this.hoverAt = null; }
     if (!moved && !camMoving && !this.dirty) return;

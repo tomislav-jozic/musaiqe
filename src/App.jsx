@@ -84,10 +84,8 @@ export default function App() {
   return (
     <div className="app">
       {mode === "planet"
-        ? <PlanetView graph={graph} style={style} pileIds={pileIds} chains={chains} spin={spin}
-            insets={[railOpen ? 300 : 0, pile.length ? 340 : 0]} onSelect={select} onSpin={setSpin} api={api} />
-        : <GraphView graph={graph} style={style} pileIds={pileIds} chains={chains} spin={spin}
-            insets={[railOpen ? 300 : 0, pile.length ? 340 : 0]} onSelect={select} onSpin={setSpin} api={api} />}
+        ? <PlanetView graph={graph} style={style} pileIds={pileIds} chains={chains} spin={spin} onSelect={select} onSpin={setSpin} api={api} />
+        : <GraphView graph={graph} style={style} pileIds={pileIds} chains={chains} spin={spin} onSelect={select} onSpin={setSpin} api={api} />}
 
       <section className={"sheet rail" + (railOpen ? "" : " closed")} aria-label="Map controls">
         <header className="rail-head">

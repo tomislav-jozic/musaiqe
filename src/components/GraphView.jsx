@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Engine from "../engine/Engine.js";
 
 /* Hosts the three.js engine and keeps it in sync with React state. */
-export default function GraphView({ graph, style, pileIds, chains, spin, insets, onSelect, onSpin, api }) {
+export default function GraphView({ graph, style, pileIds, chains, spin, onSelect, onSpin, api }) {
   const host = useRef(null), labels = useRef(null), eng = useRef(null);
   const [failed, setFailed] = useState(false);
   const cb = useRef({});
@@ -19,7 +19,6 @@ export default function GraphView({ graph, style, pileIds, chains, spin, insets,
   useEffect(() => { if (eng.current) { eng.current.style = style; eng.current.setGraph(graph); } }, [graph]);
   useEffect(() => { if (eng.current && eng.current.g) eng.current.applyStyle(style); }, [style]);
   useEffect(() => { if (eng.current) eng.current.setSpin(spin); }, [spin]);
-  useEffect(() => { if (eng.current) eng.current.setInsets(insets[0], insets[1]); }, [insets[0], insets[1]]);
 
   /* The pile: each picked artist plus, between every consecutive pair, whatever chain of
      members/guests/collaborations actually connects them (or just that pick's own direct

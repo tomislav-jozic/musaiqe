@@ -3,7 +3,7 @@ import { clamp, hash, OTHER_COLOR } from "../lib/utils.js";
 
 /* ───────────────────────── 3D engine: genres as territories, bands as pins ─────────────────────────
    Same external shape as Engine.js (constructor(host, labelHost, cb), setGraph, applyStyle, setHighlight,
-   focus, frame, setSpin, setInsets, resetView, dispose) so it's a drop-in alternative from React's side. */
+   focus, frame, setSpin, resetView, dispose) so it's a drop-in alternative from React's side. */
 const DETAIL = 20; /* -> 8820 low-poly faces, plenty for crisp borders at this scale */
 const PIN_MIN_H = 6, PIN_MAX_H = 34, STEM_R = .6, BULB_MIN = 2.4, BULB_MAX = 5.6;
 const MIN_D = 300, MAX_D = 1400;
@@ -74,9 +74,7 @@ export default class PlanetEngine {
     this.mo = new MutationObserver(() => this.readTheme()); this.mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
     this.mq = window.matchMedia("(prefers-color-scheme: dark)"); this.onScheme = () => this.readTheme(); this.mq.addEventListener && this.mq.addEventListener("change", this.onScheme);
   }
-  setInsets(left, right) { this.goalOff = this.w > 820 ? (right - left) / 2 : 0; if (this.reduced) { this.off = this.goalOff; this.applyOffset(); } this.dirty = true; }
-  applyOffset() { const o = Math.round(this.off || 0); if (o) this.camera.setViewOffset(this.w, this.h, o, 0, this.w, this.h); else this.camera.clearViewOffset(); }
-  resize() { const w = this.host.clientWidth || 1, h = this.host.clientHeight || 1; this.w = w; this.h = h; this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.applyOffset(); this.camera.updateProjectionMatrix(); this.dirty = true; }
+  resize() { const w = this.host.clientWidth || 1, h = this.host.clientHeight || 1; this.w = w; this.h = h; this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); this.dirty = true; }
   resetView() { this.goal.theta = .7; this.goal.phi = 1.15; this.goal.dist = 620; this.dirty = true; }
   setSpin(v) { this.spin = v; this.dirty = true; }
   setHover(i) { if (i === this.hover) return; this.hover = i; this.el.style.cursor = i >= 0 ? "pointer" : "grab"; this.dirty = true; }
@@ -293,7 +291,6 @@ export default class PlanetEngine {
     this.raf = requestAnimationFrame(this.loop); if (!this.g) return;
     if (this.spin) this.goal.theta += .0011;
     const V = this.view, Gl = this.goal, k = this.reduced ? 1 : .14, dT = Gl.theta - V.theta, dP = Gl.phi - V.phi, dD = Gl.dist - V.dist;
-    const dO = (this.goalOff || 0) - (this.off || 0); if (Math.abs(dO) > .5) { this.off = (this.off || 0) + dO * .14; this.applyOffset(); this.dirty = true; }
     const camMoving = Math.abs(dT) > 1e-4 || Math.abs(dP) > 1e-4 || Math.abs(dD) > .05;
     if (this.hoverAt && !camMoving) { this.setHover(this.pick(this.hoverAt[0], this.hoverAt[1])); this.hoverAt = null; }
     if (!camMoving && !this.dirty) return;

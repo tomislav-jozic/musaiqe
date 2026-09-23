@@ -3,7 +3,7 @@ import PlanetEngine from "../engine/PlanetEngine.js";
 
 /* Hosts the planet engine and keeps it in sync with React state. Mirrors GraphView.jsx's wiring
    so it's a drop-in alternative view mode from App.jsx's point of view. */
-export default function PlanetView({ graph, style, pileIds, chains, spin, insets, onSelect, onSpin, api }) {
+export default function PlanetView({ graph, style, pileIds, chains, spin, onSelect, onSpin, api }) {
   const host = useRef(null), labels = useRef(null), eng = useRef(null);
   const [failed, setFailed] = useState(false);
   const cb = useRef({});
@@ -20,7 +20,6 @@ export default function PlanetView({ graph, style, pileIds, chains, spin, insets
   useEffect(() => { if (eng.current) { eng.current.style = style; eng.current.setGraph(graph); } }, [graph]);
   useEffect(() => { if (eng.current && eng.current.g) eng.current.applyStyle(style); }, [style]);
   useEffect(() => { if (eng.current) eng.current.setSpin(spin); }, [spin]);
-  useEffect(() => { if (eng.current) eng.current.setInsets(insets[0], insets[1]); }, [insets[0], insets[1]]);
 
   /* The pile: each picked artist plus, between every consecutive pair, whatever chain of
      members/guests/collaborations actually connects them (or just that pick's own direct
