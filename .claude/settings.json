@@ -33,7 +33,9 @@
       "Bash(pkill -f \"chrome-glass-profile\")",
       "Bash(node drive_neumorphism.mjs)",
       "Bash(node drive_final_check.mjs)",
-      "Bash(pkill -f \"chrome-.*-profile\")"
+      "Bash(pkill -f \"chrome-.*-profile\")",
+      "Bash(node drive_tour.mjs)",
+      "Bash(pkill -f \"chrome-tour-profile\")"
     ]
   }
 }

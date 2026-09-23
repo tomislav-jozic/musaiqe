@@ -5,6 +5,7 @@ import { Field, Seg } from "./components/Controls.jsx";
 import Search from "./components/Search.jsx";
 import Notes from "./components/Notes.jsx";
 import DataModal from "./components/DataModal.jsx";
+import Tour from "./components/Tour.jsx";
 import { fmt, full, store } from "./lib/utils.js";
 import { generateScene } from "./lib/generate.js";
 import { prepareDataset, buildGraph, shortestPath } from "./lib/dataset.js";
@@ -27,6 +28,8 @@ export default function App() {
     if (theme === "system") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", theme);
   }, [theme]);
   const [custom, setCustom] = useState(() => store.get("linernotes:data"));
+  const [showTour, setShowTour] = useState(() => !store.get("linernotes:tour"));
+  const dismissTour = () => { store.set("linernotes:tour", true); setShowTour(false); };
   const [S, setS] = useState(() => ({ ...DEFAULTS, ...saved.settings, types: { ...DEFAULTS.types, ...(saved.settings && saved.settings.types) } }));
   const [pileIds, setPileIds] = useState([]);
   const [railOpen, setRail] = useState(() => window.innerWidth > 820), [modal, setModal] = useState(false), [spin, setSpin] = useState(true);
@@ -196,7 +199,10 @@ export default function App() {
         <span className="hint">{mode === "planet" ? "Drag to orbit, scroll to zoom. Click a pin for its liner notes." : "Drag to orbit, scroll to zoom, right-drag to pan. Click an artist for its liner notes."}</span>
         <button type="button" className="icon-btn" onClick={() => api.current && api.current.resetView()}>Reset view</button>
         <button type="button" className="icon-btn" aria-pressed={spin} onClick={() => setSpin(s => !s)}>{spin ? "Stop spinning" : "Spin"}</button>
+        <button type="button" className="icon-btn" aria-label="How this works" onClick={() => setShowTour(true)}>?</button>
       </div>
+
+      {showTour && <Tour onClose={dismissTour} />}
 
       {modal && (
         <DataModal ds={ds} count={count} onClose={() => setModal(false)}

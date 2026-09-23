@@ -128,7 +128,7 @@ button,input,select,.stack-row-main{transition:background-color .15s ease,border
 .notes .sub{color:var(--muted);margin:0;font-size:13px}
 .notes .close{position:absolute;top:10px;right:10px}
 .notes.stack .close + *{margin-top:26px}
-.notes .eyebrow{color:var(--accent);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin:0 0 10px}
+.eyebrow{color:var(--accent);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin:0 0 10px}
 .stack-row{display:flex;align-items:center;gap:6px}
 .stack-row-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;border:0;background:transparent;padding:4px;margin:0 -4px;text-align:left;border-radius:10px}
 .stack-row-main:hover{background:var(--ctrl-hover-bg);box-shadow:var(--ctrl-hover-shadow)}
@@ -167,6 +167,11 @@ ol.path em{color:var(--muted);font-style:normal;font-size:12.5px;display:block}
 .modal h2{font-family:var(--display);font-size:24px;margin:0 0 4px;letter-spacing:-.01em}
 .modal h3{font-family:var(--display);font-size:16px;margin:18px 0 6px}
 .modal p{margin:0 0 8px;color:var(--muted);max-width:62ch}
+.modal ul{margin:0 0 8px;padding-left:20px;max-width:62ch}
+.modal li{padding:2px 0}
+.tour-example{margin:16px 0;padding:14px 16px;border-radius:var(--radius-ctrl);background:var(--panel-solid);border:1px solid var(--ctrl-border);box-shadow:var(--field-shadow)}
+.tour-example p{margin:0;color:var(--ink);max-width:none}
+.tour-example .eyebrow{margin-bottom:6px}
 .modal textarea{width:100%;min-height:150px;border-radius:var(--radius-ctrl);border:1px solid var(--ctrl-border);background:var(--field);padding:10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;resize:vertical;box-shadow:var(--field-shadow)}
 .modal pre{margin:0 0 8px;padding:10px;border-radius:var(--radius-ctrl);border:1px solid var(--line);overflow-x:auto;font-size:12px;line-height:1.5;box-shadow:var(--field-shadow)}
 .modal .num{width:92px;padding:6px 8px;border-radius:var(--radius-ctrl);border:1px solid var(--ctrl-border);background:var(--field);box-shadow:var(--field-shadow)}
