@@ -3,6 +3,8 @@ import { clamp, fmt, hash, OTHER_COLOR, RAMP } from "../lib/utils.js";
 
 /* ───────────────────────── 3D engine (three.js, no React inside) ───────────────────────── */
 const Y_SPAN = 150;
+const INTRO_STAGGER = 900, INTRO_GROW = 650; /* ms: reveal spreads over STAGGER, each node/edge takes GROW to finish */
+const easeOutCubic = t => 1 - (1 - t) * (1 - t) * (1 - t);
 export default class Engine {
   constructor(host, labelHost, cb) {
     this.host = host; this.labelHost = labelHost; this.cb = cb;
@@ -96,7 +98,31 @@ export default class Engine {
     const share = fresh / Math.max(1, g.nSim); this.alpha = share > .5 ? 1 : share > 0 ? .45 : .25;
     if (share > .5) { for (let k = 0; k < (this.reduced ? 300 : 30); k++) this.tick(); }
     if (!this.fitted || share > .5) { this.fit(!this.fitted); this.fitted = true; }
+    this.setupIntro(share > .5 && !this.reduced);
     this.dirty = true;
+  }
+  /* A mostly-fresh graph gets a build-up reveal instead of just appearing: nodes scale in
+     staggered by size (the acts that read as more prominent establish first, detail fills in
+     after), and every edge grows from whichever of its two ends appeared earlier towards the one
+     about to appear — so the web visibly reaches out and connects itself rather than popping in. */
+  setupIntro(on) {
+    const g = this.g, n = g.nodes.length;
+    this.introOn = on;
+    if (!on) { this.nodeDelay = null; this.edgeFrom = null; this.edgeTo = null; this.edgeDelay = null; return; }
+    this.introT0 = performance.now();
+    let minR = Infinity, maxR = -Infinity;
+    for (let i = 0; i < n; i++) { const r = this.rad[i]; if (r < minR) minR = r; if (r > maxR) maxR = r; }
+    const span = Math.max(1e-6, maxR - minR);
+    this.nodeDelay = new Float32Array(n);
+    for (let i = 0; i < g.nSim; i++) this.nodeDelay[i] = INTRO_STAGGER * (1 - (this.rad[i] - minR) / span);
+    for (let i = g.nSim; i < n; i++) this.nodeDelay[i] = this.nodeDelay[g.moonOf[i]] || 0;
+    const m = g.links.length;
+    this.edgeFrom = new Int32Array(m); this.edgeTo = new Int32Array(m); this.edgeDelay = new Float32Array(m);
+    g.links.forEach((l, i) => {
+      const swap = this.nodeDelay[l.t] < this.nodeDelay[l.s];
+      this.edgeFrom[i] = swap ? l.t : l.s; this.edgeTo[i] = swap ? l.s : l.t;
+      this.edgeDelay[i] = Math.min(this.nodeDelay[l.s], this.nodeDelay[l.t]);
+    });
   }
   fit(intro) { let r = 60; for (let i = 0; i < this.g.nSim; i++) r = Math.max(r, Math.hypot(this.pos[i * 3], this.pos[i * 3 + 1], this.pos[i * 3 + 2])); this.extent = r; this.goal.dist = r * 2.5 * Math.max(1, .95 * this.h / this.w); this.goal.target.set(0, 0, 0); this.follow = -1; if (intro && !this.reduced) this.view.dist = this.goal.dist * 1.6; if (this.reduced) this.view.dist = this.goal.dist; }
   resetView() { this.fit(false); this.goal.phi = 1.25; this.dirty = true; }
@@ -135,11 +161,11 @@ export default class Engine {
   paint() {
     const g = this.g; if (!g) return; const n = g.nodes.length, dimOn = this.hiNodes.size > 0, bg = this.bgC;
     const put = (arr, o, r, gg, b, k) => { arr[o] = r + (bg.r - r) * k; arr[o + 1] = gg + (bg.g - gg) * k; arr[o + 2] = b + (bg.b - b) * k; };
-    for (let i = 0; i < n; i++) { const m = g.nodes[i].type === "band" ? this.bandMesh : this.musoMesh; put(m.instanceColor.array, this.inst[i] * 3, this.base[i * 3], this.base[i * 3 + 1], this.base[i * 3 + 2], dimOn && !this.hiNodes.has(i) ? .84 : 0); }
+    for (let i = 0; i < n; i++) { const m = g.nodes[i].type === "band" ? this.bandMesh : this.musoMesh; put(m.instanceColor.array, this.inst[i] * 3, this.base[i * 3], this.base[i * 3 + 1], this.base[i * 3 + 2], dimOn && !this.hiNodes.has(i) ? .55 : 0); }
     [this.bandMesh, this.musoMesh].forEach(m => { if (m) m.instanceColor.needsUpdate = true; });
     const col = this.lines.geometry.attributes.color.array, fade = { member: .45, shared: .4, guest: .5, collab: .35 };
     this.hideEdge = new Uint8Array(g.links.length);
-    g.links.forEach((l, i) => { const c = this.edgeC[l.type] || this.inkC, k = dimOn ? (this.hiEdges.has(i) ? 0 : .93) : fade[l.type]; if (dimOn && (this.hiEdges.has(i) || this.hiNodes.has(l.s) || this.hiNodes.has(l.t))) this.hideEdge[i] = 1; put(col, i * 6, c.r, c.g, c.b, k); put(col, i * 6 + 3, c.r, c.g, c.b, k); });
+    g.links.forEach((l, i) => { const c = this.edgeC[l.type] || this.inkC, k = dimOn ? (this.hiEdges.has(i) ? 0 : .72) : fade[l.type]; if (dimOn && (this.hiEdges.has(i) || this.hiNodes.has(l.s) || this.hiNodes.has(l.t))) this.hideEdge[i] = 1; put(col, i * 6, c.r, c.g, c.b, k); put(col, i * 6 + 3, c.r, c.g, c.b, k); });
     this.lines.geometry.attributes.color.needsUpdate = true;
     /* highlighted connections get real thickness */
     if (this.tubes) { this.scene.remove(this.tubes); this.tubes.geometry.dispose(); this.tubes = null; }
@@ -174,11 +200,22 @@ export default class Engine {
   }
   syncBuffers() {
     const g = this.g, n = g.nodes.length, p = this.pos, rad = this.rad, dimOn = this.hiNodes.size > 0;
+    const introOn = this.introOn, introT = introOn ? performance.now() - this.introT0 : 0;
     for (let i = g.nSim; i < n; i++) { const q = g.moonOf[i], d = rad[q] + 4 + rad[i] * 1.6; p[i * 3] = p[q * 3] + this.moonDir[i * 3] * d; p[i * 3 + 1] = p[q * 3 + 1] + this.moonDir[i * 3 + 1] * d; p[i * 3 + 2] = p[q * 3 + 2] + this.moonDir[i * 3 + 2] * d; }
-    for (let i = 0; i < n; i++) { const m = g.nodes[i].type === "band" ? this.bandMesh : this.musoMesh, e = m.instanceMatrix.array, o = this.inst[i] * 16, s = dimOn && !this.hiNodes.has(i) ? rad[i] * .5 : rad[i];
+    for (let i = 0; i < n; i++) { const m = g.nodes[i].type === "band" ? this.bandMesh : this.musoMesh, e = m.instanceMatrix.array, o = this.inst[i] * 16;
+      let s = dimOn && !this.hiNodes.has(i) ? rad[i] * .5 : rad[i];
+      if (introOn) s *= easeOutCubic(clamp((introT - this.nodeDelay[i]) / INTRO_GROW, 0, 1));
       e[o] = s; e[o + 1] = 0; e[o + 2] = 0; e[o + 3] = 0; e[o + 4] = 0; e[o + 5] = s; e[o + 6] = 0; e[o + 7] = 0; e[o + 8] = 0; e[o + 9] = 0; e[o + 10] = s; e[o + 11] = 0; e[o + 12] = p[i * 3]; e[o + 13] = p[i * 3 + 1]; e[o + 14] = p[i * 3 + 2]; e[o + 15] = 1; }
     [this.bandMesh, this.musoMesh].forEach(m => { if (m) m.instanceMatrix.needsUpdate = true; });
-    const lp = this.lines.geometry.attributes.position.array; g.links.forEach((l, i) => { if (this.hideEdge[i]) { lp[i * 6 + 3] = lp[i * 6] = 0; lp[i * 6 + 4] = lp[i * 6 + 1] = 0; lp[i * 6 + 5] = lp[i * 6 + 2] = 0; return; } lp[i * 6] = p[l.s * 3]; lp[i * 6 + 1] = p[l.s * 3 + 1]; lp[i * 6 + 2] = p[l.s * 3 + 2]; lp[i * 6 + 3] = p[l.t * 3]; lp[i * 6 + 4] = p[l.t * 3 + 1]; lp[i * 6 + 5] = p[l.t * 3 + 2]; });
+    const lp = this.lines.geometry.attributes.position.array;
+    g.links.forEach((l, i) => {
+      if (this.hideEdge[i]) { lp[i * 6 + 3] = lp[i * 6] = 0; lp[i * 6 + 4] = lp[i * 6 + 1] = 0; lp[i * 6 + 5] = lp[i * 6 + 2] = 0; return; }
+      if (!introOn) { lp[i * 6] = p[l.s * 3]; lp[i * 6 + 1] = p[l.s * 3 + 1]; lp[i * 6 + 2] = p[l.s * 3 + 2]; lp[i * 6 + 3] = p[l.t * 3]; lp[i * 6 + 4] = p[l.t * 3 + 1]; lp[i * 6 + 5] = p[l.t * 3 + 2]; return; }
+      const from = this.edgeFrom[i], to = this.edgeTo[i], e2 = easeOutCubic(clamp((introT - this.edgeDelay[i]) / INTRO_GROW, 0, 1));
+      const fx = p[from * 3], fy = p[from * 3 + 1], fz = p[from * 3 + 2];
+      lp[i * 6] = fx; lp[i * 6 + 1] = fy; lp[i * 6 + 2] = fz;
+      lp[i * 6 + 3] = fx + (p[to * 3] - fx) * e2; lp[i * 6 + 4] = fy + (p[to * 3 + 1] - fy) * e2; lp[i * 6 + 5] = fz + (p[to * 3 + 2] - fz) * e2;
+    });
     this.lines.geometry.attributes.position.needsUpdate = true;
     if (this.tubes) { const up = new THREE.Vector3(0, 1, 0), dir = new THREE.Vector3(), q = new THREE.Quaternion(), M = new THREE.Matrix4(), S = new THREE.Vector3(), O = new THREE.Vector3();
       this.tubeList.forEach((li, k) => { const l = g.links[li]; O.set(p[l.s * 3], p[l.s * 3 + 1], p[l.s * 3 + 2]); dir.set(p[l.t * 3], p[l.t * 3 + 1], p[l.t * 3 + 2]).sub(O); const len = dir.length() || 1; q.setFromUnitVectors(up, dir.divideScalar(len)); const w = Math.max(.3, this.view.dist * .0028) * (1 + Math.min(4, l.weight) * .12); S.set(w, len, w); M.compose(O, q, S); this.tubes.setMatrixAt(k, M); }); this.tubes.instanceMatrix.needsUpdate = true; }
@@ -193,6 +230,7 @@ export default class Engine {
   loop() {
     this.raf = requestAnimationFrame(this.loop); const g = this.g; if (!g) return;
     let moved = false;
+    if (this.introOn) { if (performance.now() - this.introT0 > INTRO_STAGGER + INTRO_GROW + 60) this.introOn = false; moved = true; }
     if (this.alpha > 0) { const t0 = performance.now(); do { this.tick(); } while (this.alpha > 0 && performance.now() - t0 < 9 && this.alpha > .6); moved = true; }
     if (this.follow >= 0 && this.follow < g.nodes.length) this.goal.target.set(this.pos[this.follow * 3], this.pos[this.follow * 3 + 1], this.pos[this.follow * 3 + 2]);
     if (this.spin) this.goal.theta += .0011;
@@ -219,7 +257,7 @@ export default class Engine {
       const L = this.labels[used++]; if (L.id !== text) { L.d.textContent = text; L.id = text; } if (L.cls !== cls) { L.d.className = "lbl " + cls; L.cls = cls; }
       L.d.style.display = ""; L.d.style.opacity = cls ? 1 : clamp(1.15 - (dist - this.scene.fog.near) / (this.scene.fog.far - this.scene.fog.near), .2, 1); L.d.style.transform = "translate(" + x.toFixed(1) + "px," + y.toFixed(1) + "px) translateX(-50%)";
     };
-    const done = new Set(), go = (i, cls, force) => { if (i < 0 || i >= g.nodes.length || done.has(i)) return; done.add(i); place(i, cls, g.nodes[i].name, force); };
+    const done = new Set(), go = (i, cls, force) => { if (i < 0 || i >= g.nodes.length || done.has(i)) return; if (this.introOn && !force && performance.now() - this.introT0 < this.nodeDelay[i]) return; done.add(i); place(i, cls, g.nodes[i].name, force); };
     go(this.selected, "strong", true); go(this.hover, "strong", true);
     if (dimOn) this.labelHi.forEach(i => go(i, "", false)); else this.labelOrder.forEach(i => { if (used < (W < 700 ? 16 : 34)) go(i, "", false); });
     if (this.axisMarks.length) { const m = cam.matrix.elements, rx = m[0], rz = m[2], n = Math.hypot(rx, rz) || 1; this.axisMarks.forEach(a => { if (used >= this.labels.length) return; v.set(rx / n * this.guideR, a.y, rz / n * this.guideR).project(cam); if (v.z > 1) return; const L = this.labels[used++]; if (L.id !== a.text) { L.d.textContent = a.text; L.id = a.text; } if (L.cls !== "axis") { L.d.className = "lbl axis"; L.cls = "axis"; } L.d.style.display = ""; L.d.style.opacity = 1; L.d.style.transform = "translate(" + ((v.x * .5 + .5) * W + 6).toFixed(1) + "px," + ((-v.y * .5 + .5) * H - 7).toFixed(1) + "px)"; }); }

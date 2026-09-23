@@ -19,7 +19,21 @@
       "Bash(sed -i '' 's/9370/9371/' drive_arc.mjs)",
       "Bash(pkill -f \"chrome-arc-profile\")",
       "Bash(node drive_appearance.mjs)",
-      "Bash(pkill -f \"chrome-appearance-profile\")"
+      "Bash(pkill -f \"chrome-appearance-profile\")",
+      "Bash(node --check src/engine/Engine.js)",
+      "Bash(node drive_intro.mjs)",
+      "Bash(node drive_reduced.mjs)",
+      "Bash(pkill -f \"chrome-intro-profile\\\\|chrome-reduced-profile\")",
+      "Bash(node drive_dimfix.mjs)",
+      "Bash(pkill -f \"chrome-dimfix-profile\")",
+      "WebFetch(domain:developers.apple.com)",
+      "WebFetch(domain:superdesign.dev)",
+      "WebFetch(domain:www.joshwcomeau.com)",
+      "Bash(node drive_glass.mjs)",
+      "Bash(pkill -f \"chrome-glass-profile\")",
+      "Bash(node drive_neumorphism.mjs)",
+      "Bash(node drive_final_check.mjs)",
+      "Bash(pkill -f \"chrome-.*-profile\")"
     ]
   }
 }
