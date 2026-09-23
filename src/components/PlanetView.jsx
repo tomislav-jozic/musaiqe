@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import Engine from "../engine/Engine.js";
+import PlanetEngine from "../engine/PlanetEngine.js";
 
-/* Hosts the three.js engine and keeps it in sync with React state. */
-export default function GraphView({ graph, style, pileIds, chains, spin, insets, onSelect, onSpin, api }) {
+/* Hosts the planet engine and keeps it in sync with React state. Mirrors GraphView.jsx's wiring
+   so it's a drop-in alternative view mode from App.jsx's point of view. */
+export default function PlanetView({ graph, style, pileIds, chains, spin, insets, onSelect, onSpin, api }) {
   const host = useRef(null), labels = useRef(null), eng = useRef(null);
   const [failed, setFailed] = useState(false);
   const cb = useRef({});
@@ -10,7 +11,7 @@ export default function GraphView({ graph, style, pileIds, chains, spin, insets,
 
   useEffect(() => {
     try {
-      eng.current = new Engine(host.current, labels.current, { onSelect: id => cb.current.onSelect(id), onSpin: v => cb.current.onSpin(v) });
+      eng.current = new PlanetEngine(host.current, labels.current, { onSelect: id => cb.current.onSelect(id), onSpin: v => cb.current.onSpin(v) });
       api.current = eng.current;
     } catch (e) { console.error(e); setFailed(true); }
     return () => { if (eng.current) eng.current.dispose(); eng.current = null; };
@@ -39,7 +40,7 @@ export default function GraphView({ graph, style, pileIds, chains, spin, insets,
   useEffect(() => {
     const e = eng.current; if (!e || !e.g) return;
     const { pileIdx, nodes, edges } = pileHighlight();
-    e.setHighlight(pileIdx.length ? pileIdx[pileIdx.length - 1] : -1, nodes, edges);
+    e.setHighlight(pileIdx.length ? pileIdx[pileIdx.length - 1] : -1, nodes, edges, pileIdx.length <= 1);
   }, [graph, pileIds, chains]);
 
   useEffect(() => {
@@ -52,7 +53,7 @@ export default function GraphView({ graph, style, pileIds, chains, spin, insets,
   return (
     <div className="stage" ref={host}>
       <div className="labels" ref={labels} aria-hidden="true"></div>
-      {failed && <p className="nogl">This browser could not start WebGL, so the 3D map cannot be drawn. Try another browser or turn on hardware acceleration.</p>}
+      {failed && <p className="nogl">This browser could not start WebGL, so the planet cannot be drawn. Try another browser or turn on hardware acceleration.</p>}
     </div>
   );
 }

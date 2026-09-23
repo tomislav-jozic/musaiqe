@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(node -e \"console.log\\(typeof WebSocket\\)\")",
+      "Bash(node drive_app.mjs)",
+      "Bash(pkill -f \"chrome-drive-profile\")",
+      "Bash(node drive_pile.mjs)",
+      "Bash(node drive_pile2.mjs)",
+      "Bash(pkill -f \"chrome-pile-profile\")"
+    ]
+  }
+}
