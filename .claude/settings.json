@@ -9,7 +9,17 @@
       "Bash(node drive_pile2.mjs)",
       "Bash(pkill -f \"chrome-pile-profile\")",
       "Bash(node drive_insets.mjs)",
-      "Bash(pkill -f \"chrome-insets-profile\")"
+      "Bash(pkill -f \"chrome-insets-profile\")",
+      "Bash(node drive_themes.mjs)",
+      "Bash(node drive_light.mjs)",
+      "Bash(pkill -f \"chrome-themes-profile\\\\|chrome-light-profile\")",
+      "Bash(node drive_arc.mjs)",
+      "Bash(sed -i '' 's/--window-size=1000,900/--window-size=1400,950/' drive_arc.mjs)",
+      "Bash(sed -i '' \"s/chrome-arc-profile/chrome-arc-profile2/\" drive_arc.mjs)",
+      "Bash(sed -i '' 's/9370/9371/' drive_arc.mjs)",
+      "Bash(pkill -f \"chrome-arc-profile\")",
+      "Bash(node drive_appearance.mjs)",
+      "Bash(pkill -f \"chrome-appearance-profile\")"
     ]
   }
 }

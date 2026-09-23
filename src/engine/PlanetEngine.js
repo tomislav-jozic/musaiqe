@@ -7,6 +7,28 @@ import { clamp, hash, OTHER_COLOR } from "../lib/utils.js";
 const DETAIL = 20; /* -> 8820 low-poly faces, plenty for crisp borders at this scale */
 const PIN_MIN_H = 6, PIN_MAX_H = 34, STEM_R = .6, BULB_MIN = 2.4, BULB_MAX = 5.6;
 const MIN_D = 300, MAX_D = 1400;
+const ARC_TUBE_R = 1.1; /* real 3D thickness — a 1px Line reads as invisible against a busy globe */
+
+/* Deep, cohesive jewel tones for the Deep Space theme — cycles if a dataset ever has more genres. */
+const DEEP_SPACE_PALETTE = ["#2b2360", "#123d3a", "#4a1530", "#3a1a4a", "#14264a", "#143a24", "#4a2410", "#2a2e3a", "#451a28", "#4a3510", "#182848", "#253a1a"];
+
+/* Globe themes: how territories/pins/borders are painted, independent of the map's data or the
+   app's own light/dark setting. `territoryColors` null means "use the dataset's own genre colours"
+   (matches the constellation view's legend); a function generates a theme's own palette instead.
+   `pinColor` null means pins pick up whatever colour the territory ended up painted, so a pin
+   always reads against its own ground. Arc colours (guest/collab/member) stay tied to the app's
+   CSS tokens regardless of theme, so that vocabulary stays constant everywhere. */
+const GLOBE_THEMES = {
+  spectrum: { label: "Spectrum", territoryColors: null, borderColor: null, pinColor: null, pinLighten: .3 },
+  noir: {
+    label: "Noir", borderColor: "#fdf3e2", pinColor: "#ffb627", pinLighten: 0,
+    territoryColors: (n) => Array.from({ length: n }, (_, i) => new THREE.Color().setHSL(0, 0, n > 1 ? .14 + (i / (n - 1)) * .40 : .3)),
+  },
+  deepspace: {
+    label: "Deep Space", borderColor: "#2e3242", pinColor: null, pinLighten: .5,
+    territoryColors: (n) => Array.from({ length: n }, (_, i) => new THREE.Color(DEEP_SPACE_PALETTE[i % DEEP_SPACE_PALETTE.length])),
+  },
+};
 
 export default class PlanetEngine {
   constructor(host, labelHost, cb) {
@@ -24,7 +46,7 @@ export default class PlanetEngine {
     this.reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.view = { theta: .7, phi: 1.15, dist: 620 }; this.goal = { theta: .7, phi: 1.15, dist: 620 };
     this.spin = !this.reduced; this.hover = -1; this.selectedBand = -1; this.hiEdges = new Set();
-    this.style = { sizeBy: "listeners" };
+    this.style = { sizeBy: "listeners" }; this.globeTheme = "spectrum";
     this._white = new THREE.Color(0xffffff); this.tmpC = new THREE.Color(); this.v = new THREE.Vector3();
     const ringMat = () => new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, depthTest: false, transparent: true, fog: false });
     this.selRing = new THREE.Mesh(new THREE.RingGeometry(1.3, 1.6, 40), ringMat());
@@ -41,15 +63,29 @@ export default class PlanetEngine {
   readTheme() {
     const cs = getComputedStyle(document.documentElement), g = n => cs.getPropertyValue(n).trim();
     this.bgC = this.bgC || new THREE.Color(); this.inkC = this.inkC || new THREE.Color();
-    this.bgC.set(g("--bg") || "#0f1530"); this.inkC.set(g("--ink") || "#ece7d8");
+    this.bgC.set(g("--bg") || "#050506"); this.inkC.set(g("--ink") || "#f5f1e6");
     this.scene.background = this.bgC;
-    if (this.borderMat) this.borderMat.color.copy(this.inkC);
-    this.memberMat = this.memberMat || new THREE.LineBasicMaterial({ transparent: true, opacity: .55 });
-    this.guestMat = this.guestMat || new THREE.LineBasicMaterial({ transparent: true, opacity: .55 });
-    this.collabMat = this.collabMat || new THREE.LineBasicMaterial({ transparent: true, opacity: .55 });
+    this.applyBorderColor();
+    this.memberMat = this.memberMat || new THREE.MeshBasicMaterial({ transparent: true, opacity: .88 });
+    this.guestMat = this.guestMat || new THREE.MeshBasicMaterial({ transparent: true, opacity: .88 });
+    this.collabMat = this.collabMat || new THREE.MeshBasicMaterial({ transparent: true, opacity: .88 });
     this.memberMat.color.copy(this.inkC); this.guestMat.color.set(g("--edge-guest") || "#ffb627"); this.collabMat.color.set(g("--edge-collab") || "#5ad1e6");
     this.selRing.material.color.copy(this.inkC); this.hovRing.material.color.copy(this.inkC);
     if (this.bandNodes) this.paintPins();
+    this.dirty = true;
+  }
+  /* A globe theme may pin its own border colour (Noir/Deep Space); "Spectrum" leaves it null and
+     rides along with the app's own --ink so it still shifts with light/dark like everything else. */
+  applyBorderColor() {
+    if (!this.borderMat) return;
+    const theme = GLOBE_THEMES[this.globeTheme] || GLOBE_THEMES.spectrum;
+    if (theme.borderColor) this.borderMat.color.set(theme.borderColor); else this.borderMat.color.copy(this.inkC);
+  }
+  setGlobeTheme(key) {
+    if (!GLOBE_THEMES[key] || key === this.globeTheme) return;
+    this.globeTheme = key;
+    if (this.terrain) this.paintTerrain();
+    if (this.g && this.bandNodes) this.applyStyle(this.style, true);
     this.dirty = true;
   }
   bind() {
@@ -83,13 +119,15 @@ export default class PlanetEngine {
 
   /* Territories: rebuilt only when the dataset itself changes, not on every filter change.
      This three.js version ships IcosahedronGeometry non-indexed, so faces read straight off
-     position triplets; shared edges are matched by rounded vertex position, not vertex index. */
+     position triplets; shared edges are matched by rounded vertex position, not vertex index.
+     Geometry (shape/borders) and colour (the globe theme) are separate on purpose: switching
+     themes only needs to repaint, never rebuild ~9k faces from scratch. */
   buildTerrain(ds) {
     if (this.terrain) { this.scene.remove(this.terrain); this.terrain.geometry.dispose(); this.terrain.material.dispose(); }
     if (this.border) { this.scene.remove(this.border); this.border.geometry.dispose(); }
     const genres = ds.genres, N = genres.length, R = this.R;
     this.N = N;
-    this.capColor = genres.map(gr => new THREE.Color(gr.color));
+    this.dsGenreColors = genres.map(gr => new THREE.Color(gr.color));
     this.capDir = genres.map((gr, i) => {
       const t = N > 1 ? i / (N - 1) : 0, lat = THREE.MathUtils.lerp(72, -72, t) * Math.PI / 180, lon = i * (2 * Math.PI / N);
       const y = Math.sin(lat), r = Math.cos(lat);
@@ -105,11 +143,9 @@ export default class PlanetEngine {
       v.set((pos.getX(i0) + pos.getX(i1) + pos.getX(i2)) / 3, (pos.getY(i0) + pos.getY(i1) + pos.getY(i2)) / 3, (pos.getZ(i0) + pos.getZ(i1) + pos.getZ(i2)) / 3).normalize();
       faceOwner[f] = this.nearestGenre(v); triByGenre[faceOwner[f]].push(f);
     }
-    const colors = new Float32Array(pos.count * 3);
-    for (let f = 0; f < faceCount; f++) { const c = this.capColor[faceOwner[f]]; for (let k = 0; k < 3; k++) { const o = (f * 3 + k) * 3; colors[o] = c.r; colors[o + 1] = c.g; colors[o + 2] = c.b; } }
-    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3));
     geo.computeVertexNormals();
-    this.originalColors = colors.slice(); this.faceOwner = faceOwner; this.triByGenre = triByGenre;
+    this.faceOwner = faceOwner; this.triByGenre = triByGenre;
     this.terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: .85, metalness: .05 });
     this.terrain = new THREE.Mesh(geo, this.terrainMat); this.scene.add(this.terrain);
 
@@ -123,6 +159,19 @@ export default class PlanetEngine {
     this.borderMat = new THREE.LineBasicMaterial({ transparent: true, opacity: .4 });
     this.border = new THREE.LineSegments(borderGeo, this.borderMat); this.scene.add(this.border);
     this.readTheme();
+    this.paintTerrain();
+  }
+  /* Repaints the territories (and border colour) from the current globe theme, reusing the
+     geometry built above. Cheap enough to call on every theme switch. */
+  paintTerrain() {
+    if (!this.terrain) return;
+    const theme = GLOBE_THEMES[this.globeTheme] || GLOBE_THEMES.spectrum;
+    this.capColor = theme.territoryColors ? theme.territoryColors(this.N) : this.dsGenreColors;
+    const colorsAttr = this.terrain.geometry.attributes.color, colors = colorsAttr.array;
+    for (let f = 0; f < this.faceOwner.length; f++) { const c = this.capColor[this.faceOwner[f]]; for (let k = 0; k < 3; k++) { const o = (f * 3 + k) * 3; colors[o] = c.r; colors[o + 1] = c.g; colors[o + 2] = c.b; } }
+    colorsAttr.needsUpdate = true; this.originalColors = colors.slice();
+    this.applyBorderColor();
+    this.dirty = true;
   }
 
   /* A band's pin sits at a spot within its genre's territory, deterministic from its id so it
@@ -164,8 +213,9 @@ export default class PlanetEngine {
   }
 
   applyStyle(style, keepAlpha) {
-    this.style = style; const g = this.g; if (!g || !this.bandNodes) return;
-    const bands = this.bandNodes, ds = g.ds;
+    this.style = style; const g = this.g; if (!g || !this.bandNodes || !this.capColor) return;
+    const bands = this.bandNodes;
+    const theme = GLOBE_THEMES[this.globeTheme] || GLOBE_THEMES.spectrum;
     const metric = a => Math.log10(Math.max(1, a[style.sizeBy] || 0));
     let lo = Infinity, hi = -Infinity; bands.forEach(a => { const v = metric(a); if (v < lo) lo = v; if (v > hi) hi = v; }); if (!(hi > lo)) hi = lo + 1;
     this.pinBaseColor = this.pinBaseColor || [];
@@ -173,8 +223,10 @@ export default class PlanetEngine {
       const a = bands[i], t = clamp((metric(a) - lo) / (hi - lo), 0, 1);
       this.pinH[i] = PIN_MIN_H + (PIN_MAX_H - PIN_MIN_H) * Math.pow(t, 1.6);
       this.pinR[i] = BULB_MIN + (BULB_MAX - BULB_MIN) * t;
-      const gc = ds.genres[a.gi] ? ds.genres[a.gi].color : OTHER_COLOR;
-      this.pinBaseColor[i] = (this.pinBaseColor[i] || new THREE.Color()).set(gc).lerp(this._white, .3);
+      /* pins pick up whatever colour their territory is actually painted, so they read against
+         their own ground under any theme, unless the theme insists on one uniform pin colour */
+      const base = theme.pinColor ? this.tmpC.set(theme.pinColor) : (this.capColor[a.gi] || this.tmpC.set(OTHER_COLOR));
+      this.pinBaseColor[i] = (this.pinBaseColor[i] || new THREE.Color()).copy(base).lerp(this._white, theme.pinLighten);
     }
     this.topLabels = Array.from({ length: bands.length }, (_, i) => i).sort((a, b) => this.pinR[b] - this.pinR[a]).slice(0, 10);
     this.layoutPins(); this.paintPins(); this.dirty = true;
@@ -252,9 +304,10 @@ export default class PlanetEngine {
       const key = biA < biB ? biA + "_" + biB : biB + "_" + biA; if (drawn.has(key)) return; drawn.add(key);
       const a = apexOf(biA), b = apexOf(biB), aDir = a.clone().normalize(), bDir = b.clone().normalize(), ang = aDir.angleTo(bDir);
       const mid = aDir.clone().add(bDir).normalize().multiplyScalar(R + R * (.18 + (ang / Math.PI) * .55));
-      const geo = new THREE.BufferGeometry().setFromPoints(new THREE.QuadraticBezierCurve3(a, mid, b).getPoints(24));
+      const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+      const geo = new THREE.TubeGeometry(curve, 24, ARC_TUBE_R, 6, false);
       const mat = type === "guest" ? this.guestMat : type === "collab" ? this.collabMat : this.memberMat;
-      this.arcGroup.add(new THREE.Line(geo, mat)); count++;
+      this.arcGroup.add(new THREE.Mesh(geo, mat)); count++;
     });
   }
 

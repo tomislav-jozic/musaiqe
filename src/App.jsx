@@ -20,6 +20,12 @@ export default function App() {
   const [seed, setSeed] = useState(saved.seed || 1977), [count, setCount] = useState(saved.count || 500);
   const [source, setSource] = useState(saved.source || "rock");
   const [mode, setMode] = useState(saved.mode || "constellation");
+  const [globeTheme, setGlobeTheme] = useState(saved.globeTheme || "spectrum");
+  const [theme, setTheme] = useState(saved.theme || "dark");
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "system") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", theme);
+  }, [theme]);
   const [custom, setCustom] = useState(() => store.get("linernotes:data"));
   const [S, setS] = useState(() => ({ ...DEFAULTS, ...saved.settings, types: { ...DEFAULTS.types, ...(saved.settings && saved.settings.types) } }));
   const [pileIds, setPileIds] = useState([]);
@@ -31,7 +37,7 @@ export default function App() {
     if (custom) { try { return prepareDataset(custom); } catch (e) { store.del("linernotes:data"); } }
     return prepareDataset(source === "rock" ? parseRock() : generateScene(seed, count));
   }, [custom, seed, count, source]);
-  useEffect(() => { store.set("linernotes:v2", { seed, count, source, mode, settings: S }); }, [seed, count, source, mode, S]);
+  useEffect(() => { store.set("linernotes:v2", { seed, count, source, mode, globeTheme, theme, settings: S }); }, [seed, count, source, mode, globeTheme, theme, S]);
 
   const genresOff = useMemo(() => S.genresOff.filter(n => ds.genres.some(g => g.name === n)), [S.genresOff, ds]);
   const minListeners = ds.hasNumbers ? sliderToListeners(S.minSlider) : 0;
@@ -84,7 +90,7 @@ export default function App() {
   return (
     <div className="app">
       {mode === "planet"
-        ? <PlanetView graph={graph} style={style} pileIds={pileIds} chains={chains} spin={spin} onSelect={select} onSpin={setSpin} api={api} />
+        ? <PlanetView graph={graph} style={style} pileIds={pileIds} chains={chains} spin={spin} globeTheme={globeTheme} onSelect={select} onSpin={setSpin} api={api} />
         : <GraphView graph={graph} style={style} pileIds={pileIds} chains={chains} spin={spin} onSelect={select} onSpin={setSpin} api={api} />}
 
       <section className={"sheet rail" + (railOpen ? "" : " closed")} aria-label="Map controls">
@@ -93,8 +99,22 @@ export default function App() {
           <button type="button" className="icon-btn" aria-expanded={railOpen} onClick={() => setRail(o => !o)}>{railOpen ? "Hide" : "Controls"}</button>
         </header>
         <div className="rail-body">
+          <div className="group"><h2>Appearance</h2>
+            <Seg label="Appearance" value={theme} onChange={setTheme} options={[["dark", "Dark"], ["light", "Light"], ["system", "System"]]} />
+          </div>
+
           <div className="group"><h2>View</h2>
             <Seg label="View" value={mode} onChange={setMode} options={[["constellation", "Constellation"], ["planet", "Planet"]]} />
+            {mode === "planet" && <>
+              <div style={{ marginTop: 10 }}>
+                <Seg label="Globe theme" value={globeTheme} onChange={setGlobeTheme} options={[["spectrum", "Spectrum"], ["noir", "Noir"], ["deepspace", "Deep Space"]]} />
+              </div>
+              <p className="tally" style={{ marginTop: 6 }}>
+                {globeTheme === "noir" ? "Territories by tone, pins in one accent colour."
+                  : globeTheme === "deepspace" ? "Deep jewel tones, pins glow against their ground."
+                  : "Territories and pins follow the genre legend."}
+              </p>
+            </>}
           </div>
 
           <Search ds={ds} onPick={select} />
